@@ -1,0 +1,33 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.leadRoute = void 0;
+const express_1 = __importDefault(require("express"));
+const verifyValidate_1 = __importDefault(require("../../middlewares/verifyValidate"));
+const verifyPermission_1 = require("../../middlewares/verifyPermission");
+const leadValidation_1 = require("./leadValidation");
+const leadController_1 = require("./leadController");
+const fileUploader_1 = require("../../utils/fileUploader");
+const auth_1 = require("../../middlewares/auth");
+const Router = express_1.default.Router();
+const upload = (0, fileUploader_1.fileUploader)('lead').single('file');
+Router.post('/add', (0, verifyPermission_1.verifyPermission)('lead', 'create'), (0, verifyValidate_1.default)(leadValidation_1.leadValidation), leadController_1.addLeadController);
+Router.post('/bulk-upload', (0, verifyPermission_1.verifyPermission)('lead', 'create'), upload, (req, res, next) => {
+    req.body = req.body.data && JSON.parse(req.body.data);
+    next();
+}, leadController_1.bulkLeadController);
+Router.get('/all', (0, verifyPermission_1.verifyPermission)('lead', 'read'), leadController_1.getAllLeadController);
+// Router.get('/duplicate', findDuplicateLeadsByPhoneController);
+// Router.get('/without0', findLeadWithOutStart0Controller);
+Router.get('/targeted-leads', (0, verifyPermission_1.verifyPermission)('lead', 'read'), leadController_1.getTargetedLeadController);
+Router.get('/targeted-leads-email', (0, verifyPermission_1.verifyPermission)('lead', 'read'), leadController_1.getTargetedLeadEmailController);
+Router.get('/:id', (0, verifyPermission_1.verifyPermission)('lead', 'read'), leadController_1.getByIdLeadController);
+Router.put('/update/:id', (0, verifyPermission_1.verifyPermission)('lead', 'update'), (0, verifyValidate_1.default)(leadValidation_1.updateLeadValidation), leadController_1.updateLeadController);
+Router.put('/update-status/:id', (0, verifyPermission_1.verifyPermission)('lead', 'update'), leadController_1.updateLeadStatusController);
+Router.put('/back/:id', (0, auth_1.auth)('superAdmin', 'Admin'), leadController_1.backLeadController);
+Router.put('/bulk-back', (0, auth_1.auth)('superAdmin', 'Admin'), leadController_1.bulkBackLeadController);
+Router.delete('/delete/:id', (0, verifyPermission_1.verifyPermission)('lead', 'delete'), leadController_1.deleteLeadController);
+Router.delete('/bulk-delete', (0, verifyPermission_1.verifyPermission)('lead', 'delete'), leadController_1.bulkSoftDeleteLeadController);
+exports.leadRoute = Router;

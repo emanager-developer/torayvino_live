@@ -1,0 +1,26 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.userRoute = void 0;
+const express_1 = __importDefault(require("express"));
+const userController_1 = require("./userController");
+const userController_2 = require("./userController");
+const verifyValidate_1 = __importDefault(require("../../middlewares/verifyValidate"));
+const userValidation_1 = require("./userValidation");
+const verifyPermission_1 = require("../../middlewares/verifyPermission");
+const auth_1 = require("../../middlewares/auth");
+const Router = express_1.default.Router();
+Router.post('/add', (0, verifyPermission_1.verifyPermission)('user', 'create'), (0, verifyValidate_1.default)(userValidation_1.userValidation), userController_1.addUserController);
+Router.get('/all', (0, verifyPermission_1.verifyPermission)('user', 'read'), userController_1.getAllUserController);
+Router.get('/:id', userController_1.getSingleUserController);
+Router.put('/update/:id', (0, verifyPermission_1.verifyPermission)('user', 'update'), userController_1.updateUserController);
+Router.put('/update/profile/:id', userController_1.updateProfileController);
+Router.patch('/update/password/:id', userController_1.updatePasswordController);
+Router.put('/bulk-back', (0, auth_1.auth)('superAdmin', 'Admin'), userController_1.bulkBackUserController);
+Router.delete('/delete/:id', (0, verifyPermission_1.verifyPermission)('user', 'delete'), userController_1.deleteUserController);
+Router.post('/admin/send-reset-email-otp', (0, verifyValidate_1.default)(userValidation_1.sendAdminResetEmailValidation), userController_2.sendAdminResetEmailOTPController);
+Router.post('/admin/verify-reset-email-otp', (0, verifyValidate_1.default)(userValidation_1.verifyAdminResetEmailValidation), userController_2.verifyAdminResetEmailOTPController);
+Router.post('/admin/reset-password-email', (0, verifyValidate_1.default)(userValidation_1.resetAdminPasswordValidation), userController_2.resetAdminPasswordController);
+exports.userRoute = Router;

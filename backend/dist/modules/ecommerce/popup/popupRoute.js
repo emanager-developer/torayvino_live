@@ -1,0 +1,20 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.popupRoute = void 0;
+const express_1 = __importDefault(require("express"));
+const Router = express_1.default.Router();
+const popupController_1 = require("./popupController");
+const fileUploader_1 = require("../../../utils/fileUploader");
+const verifyPermission_1 = require("../../../middlewares/verifyPermission");
+const upload = (0, fileUploader_1.fileUploader)('popup').single('image');
+Router.post('/add', (0, verifyPermission_1.verifyPermission)('popup', 'create'), upload, popupController_1.addPopup);
+Router.get('/', popupController_1.getPopups);
+Router.get('/active', popupController_1.getActivePopup);
+Router.get('/:id', popupController_1.getPopupById);
+Router.patch('/update/:id', (0, verifyPermission_1.verifyPermission)('popup', 'update'), upload, popupController_1.updatePopup);
+Router.patch('/toggle-status/:id', (0, verifyPermission_1.verifyPermission)('popup', 'update'), popupController_1.togglePopupStatus);
+Router.delete('/delete/:id', (0, verifyPermission_1.verifyPermission)('popup', 'delete'), popupController_1.deletePopup);
+exports.popupRoute = Router;

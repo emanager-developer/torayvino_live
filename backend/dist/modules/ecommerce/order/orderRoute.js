@@ -1,0 +1,25 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.orderRoute = void 0;
+const express_1 = __importDefault(require("express"));
+const orderController_1 = require("./orderController");
+const verifyPermission_1 = require("../../../middlewares/verifyPermission");
+const Router = express_1.default.Router();
+Router.post('/add', orderController_1.addOrderController);
+Router.get('/all', orderController_1.getAllOrdersController);
+Router.get('/todaysSales', orderController_1.getTodaysSalesController);
+Router.get('/allSales', orderController_1.getAllSalesController);
+Router.get('/track', orderController_1.searchOrderController);
+Router.get('/export', orderController_1.exportOrdersController);
+Router.post('/export', orderController_1.exportSelectedOrdersController);
+Router.get('/customer/:customerId', orderController_1.getOrdersByCustomerIdController);
+Router.get('/:id', orderController_1.getOrderByIdController);
+Router.patch('/update/status/:id', (0, verifyPermission_1.verifyPermission)('order', 'update'), orderController_1.updateOrderStatusController);
+Router.patch('/customer/update/status/:id', orderController_1.updateOrderStatusByCustomerController);
+Router.delete('/delete/:id', (0, verifyPermission_1.verifyPermission)('order', 'delete'), orderController_1.deleteOrderController);
+Router.post('/send-steadfast', (0, verifyPermission_1.verifyPermission)('order', 'update'), orderController_1.sendToSteadfastController);
+Router.post('/send-pathao', (0, verifyPermission_1.verifyPermission)('order', 'update'), orderController_1.sendToPathaoController);
+exports.orderRoute = Router;
