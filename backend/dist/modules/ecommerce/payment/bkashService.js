@@ -48,6 +48,16 @@ const userModel_1 = require("../../user/userModel");
 const customerModel_1 = require("../../customer/customerModel");
 const sendEmail_1 = require("../../../utils/sendEmail");
 const sendSMS_1 = require("../../../utils/sendSMS");
+const shouldLogRefundDebug = () => config_1.default.NODE_ENV === 'development' ||
+    String(process.env.BKASH_REFUND_DEBUG || '').toLowerCase() === 'true';
+const mask = (value, visibleEnd = 6) => {
+    const s = String(value !== null && value !== void 0 ? value : '');
+    if (!s)
+        return '';
+    if (s.length <= visibleEnd)
+        return s;
+    return `${'*'.repeat(Math.max(0, s.length - visibleEnd))}${s.slice(-visibleEnd)}`;
+};
 // Get and cache bKash Token in DB (55 minutes expiry for safety)
 function getBkashToken() {
     return __awaiter(this, arguments, void 0, function* (forceRefresh = false) {
@@ -83,6 +93,7 @@ function getBkashToken() {
     });
 }
 // Safe request wrapper (auto-refresh token on 401)
+// eslint-disable-next-line no-unused-vars
 function safeBkashRequest(requestFn) {
     return __awaiter(this, void 0, void 0, function* () {
         var _a;
@@ -315,6 +326,18 @@ const executeBkashPayment = (paymentID, status) => __awaiter(void 0, void 0, voi
             yield session.abortTransaction();
             throw new Error('Payment not found');
         }
+        // Idempotency guard: if payment already succeeded, return existing success response
+        if (payment.status === 'success') {
+            yield session.commitTransaction();
+            return {
+                success: true,
+                status: 'success',
+                orderId: payment.orderId,
+                paymentId: payment._id,
+                transactionId: payment.transactionId,
+                redirectUrl: `${config_1.default.FRONTEND_URL}/payment/success/${payment.transactionId}`,
+            };
+        }
         const order = yield orderModel_1.Order.findById(payment.orderId).session(session);
         if (!order) {
             yield session.abortTransaction();
@@ -487,8 +510,9 @@ const executeBkashPayment = (paymentID, status) => __awaiter(void 0, void 0, voi
             }
             else {
                 // Payment execution failed
-                yield paymentModel_1.Payment.findByIdAndUpdate(payment._id, { status: 'failed' }, { session });
-                yield orderModel_1.Order.findByIdAndUpdate(order._id, { paymentStatus: 'failed' }, { session });
+                // Only mark as failed if it isn't already successful (protect against races)
+                yield paymentModel_1.Payment.findOneAndUpdate({ _id: payment._id, status: { $ne: 'success' } }, { status: 'failed' }, { session });
+                yield orderModel_1.Order.findOneAndUpdate({ _id: order._id, paymentStatus: { $ne: 'success' } }, { paymentStatus: 'failed' }, { session });
                 yield session.commitTransaction();
                 return {
                     success: false,
@@ -508,10 +532,11 @@ const executeBkashPayment = (paymentID, status) => __awaiter(void 0, void 0, voi
         yield session.abortTransaction();
         // Update payment status to failed in case of error
         try {
-            yield paymentModel_1.Payment.findOneAndUpdate({ transactionId: paymentID }, { status: 'failed' });
+            // Avoid overwriting a successful status in case of concurrent callbacks
+            yield paymentModel_1.Payment.findOneAndUpdate({ transactionId: paymentID, status: { $ne: 'success' } }, { status: 'failed' });
             const failedPayment = yield paymentModel_1.Payment.findOne({ transactionId: paymentID });
             if (failedPayment) {
-                yield orderModel_1.Order.findByIdAndUpdate(failedPayment.orderId, { paymentStatus: 'failed' });
+                yield orderModel_1.Order.findOneAndUpdate({ _id: failedPayment.orderId, paymentStatus: { $ne: 'success' } }, { paymentStatus: 'failed' });
             }
             // eslint-disable-next-line no-console
             console.log("Updated payment status to failed due to error");
@@ -527,6 +552,7 @@ const executeBkashPayment = (paymentID, status) => __awaiter(void 0, void 0, voi
 });
 // Refund bKash Payment
 const refundBkashPayment = (paymentID, trxID, amount, reason, sku) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a, _b, _c, _d, _e, _f;
     const refundData = {
         paymentID,
         trxID,
@@ -534,24 +560,135 @@ const refundBkashPayment = (paymentID, trxID, amount, reason, sku) => __awaiter(
         reason,
         sku,
     };
-    const { data } = yield safeBkashRequest((token) => __awaiter(void 0, void 0, void 0, function* () {
-        return axios_1.default.post(`${config_1.default.BKASH_BASE_URL}/tokenized/checkout/payment/refund`, refundData, {
-            headers: {
-                Accept: 'application/json',
-                authorization: token,
-                'x-app-key': config_1.default.BKASH_APP_KEY,
-            },
+    const start = Date.now();
+    const refundUrl = `${config_1.default.BKASH_BASE_URL}/tokenized/checkout/payment/refund`;
+    if (shouldLogRefundDebug()) {
+        // eslint-disable-next-line no-console
+        console.log('[bkash-refund] start', {
+            url: refundUrl,
+            trxID: mask(trxID),
+            paymentID: mask(paymentID),
+            amount,
+            sku,
         });
-    }));
-    // Update DB with refund status
-    const payment = yield paymentModel_1.Payment.findOneAndUpdate({ transactionId: trxID }, { status: data.transactionStatus === "Completed" ? "refunded" : "refund_initiated",
-        refundedDate: data.transactionStatus === "Completed" ? new Date() : undefined,
-    }, { new: true });
-    // Update order payment status
-    if (payment) {
-        yield orderModel_1.Order.findByIdAndUpdate(payment.orderId, { paymentStatus: data.transactionStatus === "Completed" ? "refunded" : "refund_initiated" });
     }
-    return data;
+    try {
+        const { data } = yield safeBkashRequest((token) => __awaiter(void 0, void 0, void 0, function* () {
+            return axios_1.default.post(`${config_1.default.BKASH_BASE_URL}/tokenized/checkout/payment/refund`, refundData, {
+                headers: {
+                    Accept: 'application/json',
+                    authorization: token,
+                    'x-app-key': config_1.default.BKASH_APP_KEY,
+                },
+                timeout: Number(process.env.BKASH_HTTP_TIMEOUT_MS || 20000),
+            });
+        }));
+        if (shouldLogRefundDebug()) {
+            // eslint-disable-next-line no-console
+            console.log('[bkash-refund] response', {
+                ms: Date.now() - start,
+                trxID: mask(trxID),
+                statusCode: data === null || data === void 0 ? void 0 : data.statusCode,
+                transactionStatus: data === null || data === void 0 ? void 0 : data.transactionStatus,
+                statusMessage: data === null || data === void 0 ? void 0 : data.statusMessage,
+            });
+        }
+        const statusCode = (_c = (_b = (_a = data === null || data === void 0 ? void 0 : data.statusCode) === null || _a === void 0 ? void 0 : _a.toString) === null || _b === void 0 ? void 0 : _b.call(_a)) !== null && _c !== void 0 ? _c : '';
+        const transactionStatus = ((_d = data === null || data === void 0 ? void 0 : data.transactionStatus) !== null && _d !== void 0 ? _d : '').toString();
+        const normalizedTxn = transactionStatus.toLowerCase();
+        const statusMessage = (data === null || data === void 0 ? void 0 : data.statusMessage) || (data === null || data === void 0 ? void 0 : data.message) || '';
+        const isCompleted = statusCode === '0000' && (normalizedTxn === 'completed' || normalizedTxn === 'success');
+        const isInitiated = statusCode === '0000' && !isCompleted;
+        // Always store refund response for audit/debug
+        const payment = yield paymentModel_1.Payment.findOne({ transactionId: trxID });
+        const mergedGatewayResponse = Object.assign(Object.assign({}, ((payment === null || payment === void 0 ? void 0 : payment.gatewayResponse) || {})), { refund: data });
+        if (isCompleted) {
+            const updated = yield paymentModel_1.Payment.findOneAndUpdate({ transactionId: trxID, status: { $ne: 'refunded' } }, {
+                status: 'refunded',
+                refundedDate: new Date(),
+                gatewayResponse: mergedGatewayResponse,
+            }, { new: true });
+            if (updated) {
+                yield orderModel_1.Order.findByIdAndUpdate(updated.orderId, {
+                    paymentStatus: 'refunded',
+                });
+            }
+            return {
+                success: true,
+                message: 'Refund completed successfully',
+                data,
+            };
+        }
+        if (isInitiated) {
+            const updated = yield paymentModel_1.Payment.findOneAndUpdate({ transactionId: trxID, status: { $nin: ['refunded'] } }, {
+                status: 'refund_initiated',
+                gatewayResponse: mergedGatewayResponse,
+            }, { new: true });
+            if (updated) {
+                yield orderModel_1.Order.findByIdAndUpdate(updated.orderId, {
+                    paymentStatus: 'refund_initiated',
+                });
+            }
+            return {
+                success: true,
+                message: 'Refund initiated',
+                data,
+            };
+        }
+        // Failed (or unexpected response)
+        const failReason = statusMessage || 'Refund failed';
+        yield paymentModel_1.Payment.findOneAndUpdate({ transactionId: trxID, status: { $nin: ['refunded'] } }, {
+            status: 'refund_failed',
+            gatewayResponse: mergedGatewayResponse,
+        }, { new: true });
+        return {
+            success: false,
+            message: failReason,
+            data,
+        };
+    }
+    catch (err) {
+        const gatewayData = (_e = err === null || err === void 0 ? void 0 : err.response) === null || _e === void 0 ? void 0 : _e.data;
+        const isTimeout = (err === null || err === void 0 ? void 0 : err.code) === 'ETIMEDOUT' ||
+            (err === null || err === void 0 ? void 0 : err.code) === 'ECONNABORTED' ||
+            String((err === null || err === void 0 ? void 0 : err.message) || '').toLowerCase().includes('timeout');
+        const failReason = (gatewayData === null || gatewayData === void 0 ? void 0 : gatewayData.statusMessage) ||
+            (gatewayData === null || gatewayData === void 0 ? void 0 : gatewayData.message) ||
+            (isTimeout
+                ? 'bKash gateway timeout (ETIMEDOUT). Please retry.'
+                : (err === null || err === void 0 ? void 0 : err.message) || 'Refund request failed');
+        if (shouldLogRefundDebug()) {
+            // eslint-disable-next-line no-console
+            console.error('[bkash-refund] error', {
+                ms: Date.now() - start,
+                url: refundUrl,
+                trxID: mask(trxID),
+                paymentID: mask(paymentID),
+                code: err === null || err === void 0 ? void 0 : err.code,
+                errno: err === null || err === void 0 ? void 0 : err.errno,
+                syscall: err === null || err === void 0 ? void 0 : err.syscall,
+                address: err === null || err === void 0 ? void 0 : err.address,
+                port: err === null || err === void 0 ? void 0 : err.port,
+                httpStatus: (_f = err === null || err === void 0 ? void 0 : err.response) === null || _f === void 0 ? void 0 : _f.status,
+                gatewayStatusCode: gatewayData === null || gatewayData === void 0 ? void 0 : gatewayData.statusCode,
+                gatewayStatusMessage: (gatewayData === null || gatewayData === void 0 ? void 0 : gatewayData.statusMessage) || (gatewayData === null || gatewayData === void 0 ? void 0 : gatewayData.message),
+            });
+        }
+        // Store error for audit; keep refundable by allowing retry (refund_failed)
+        try {
+            const payment = yield paymentModel_1.Payment.findOne({ transactionId: trxID });
+            const mergedGatewayResponse = Object.assign(Object.assign({}, ((payment === null || payment === void 0 ? void 0 : payment.gatewayResponse) || {})), { refundError: gatewayData || { message: failReason } });
+            yield paymentModel_1.Payment.findOneAndUpdate({ transactionId: trxID, status: { $nin: ['refunded'] } }, { status: 'refund_failed', gatewayResponse: mergedGatewayResponse }, { new: true });
+        }
+        catch (_g) {
+            // ignore secondary update errors
+        }
+        return {
+            success: false,
+            message: failReason,
+            data: gatewayData,
+        };
+    }
 });
 exports.BkashService = {
     createBkashPayment,

@@ -27,7 +27,15 @@ const paymentSchema = new mongoose_1.Schema({
     },
     status: {
         type: String,
-        enum: ['pending', 'success', 'failed', 'cancelled'],
+        enum: [
+            'pending',
+            'success',
+            'failed',
+            'cancelled',
+            'refunded',
+            'refund_initiated',
+            'refund_failed',
+        ],
         default: 'pending',
     },
     gatewayResponse: {

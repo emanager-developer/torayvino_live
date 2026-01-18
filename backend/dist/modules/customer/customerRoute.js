@@ -41,4 +41,5 @@ Router.patch('/updateActive/:id',
 customerController_1.updateCustomerActiveController);
 Router.post('/send-sms', customerController_1.sendSMSController);
 Router.post('/send-email', customerController_1.sendEmailController);
+Router.delete('/delete/:id', (0, verifyPermission_1.verifyPermission)('customer', 'delete'), customerController_1.deleteCustomerController);
 exports.customerRoute = Router;

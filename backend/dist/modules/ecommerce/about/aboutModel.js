@@ -19,5 +19,68 @@ const aboutSchema = new mongoose_1.Schema({
         type: String,
         required: true,
     },
+    highlightTitle: {
+        type: String,
+    },
+    highlightSubTitle: {
+        type: String,
+    },
+    videoUrl: {
+        type: String,
+    },
+    testimonial: {
+        name: {
+            type: String,
+        },
+        role: {
+            type: String,
+        },
+        message: {
+            type: String,
+        },
+        image: {
+            type: String,
+        },
+    },
+    testimonials: [
+        {
+            name: {
+                type: String,
+            },
+            role: {
+                type: String,
+            },
+            message: {
+                type: String,
+            },
+            image: {
+                type: String,
+            },
+        },
+    ],
+    whatWeDo: {
+        title: {
+            type: String,
+        },
+        description: {
+            type: String,
+        },
+    },
+    whoWeServe: {
+        title: {
+            type: String,
+        },
+        description: {
+            type: String,
+        },
+    },
+    ourVision: {
+        title: {
+            type: String,
+        },
+        description: {
+            type: String,
+        },
+    },
 });
 exports.About = (0, mongoose_1.model)('About', aboutSchema);

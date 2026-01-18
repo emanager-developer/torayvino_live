@@ -14,9 +14,14 @@ const notFound_1 = require("./errors/notFound");
 const cookie_parser_1 = __importDefault(require("cookie-parser"));
 const app = (0, express_1.default)();
 // Middleware
-app.use(express_1.default.json());
+app.use(express_1.default.json({
+    limit: '2mb',
+}));
 app.use((0, cookie_parser_1.default)());
-app.use(express_1.default.urlencoded({ extended: true }));
+app.use(express_1.default.urlencoded({
+    extended: true,
+    limit: '2mb',
+}));
 app.use(express_1.default.static('uploads'));
 app.use((0, cors_1.default)({
     origin: ['https://torayvinobd.store', 'http://localhost:1700'],

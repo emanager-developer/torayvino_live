@@ -19,7 +19,46 @@ const globalErrorHandler = (err, req, res, next) => {
             message: 'Something went wrong',
         },
     ];
-    if (err instanceof zod_1.ZodError) {
+    // Body size / payload too large (body-parser)
+    if ((err === null || err === void 0 ? void 0 : err.type) === 'entity.too.large' ||
+        (err === null || err === void 0 ? void 0 : err.name) === 'PayloadTooLargeError' ||
+        (err === null || err === void 0 ? void 0 : err.status) === 413) {
+        statusCode = 413;
+        message = 'Request payload is too large';
+        errorSources = [
+            {
+                path: '',
+                message,
+            },
+        ];
+    }
+    // Multer errors (file uploads)
+    else if ((err === null || err === void 0 ? void 0 : err.name) === 'MulterError') {
+        const code = err === null || err === void 0 ? void 0 : err.code;
+        if (code === 'LIMIT_FILE_SIZE') {
+            statusCode = 413;
+            message = 'Uploaded file is too large';
+        }
+        else if (code === 'LIMIT_FILE_COUNT') {
+            statusCode = 413;
+            message = 'Too many files uploaded';
+        }
+        else if (code === 'LIMIT_UNEXPECTED_FILE') {
+            statusCode = 400;
+            message = (err === null || err === void 0 ? void 0 : err.message) || 'Unexpected file field';
+        }
+        else {
+            statusCode = 400;
+            message = (err === null || err === void 0 ? void 0 : err.message) || 'Invalid upload';
+        }
+        errorSources = [
+            {
+                path: '',
+                message,
+            },
+        ];
+    }
+    else if (err instanceof zod_1.ZodError) {
         const simplifiedError = (0, handleZodError_1.default)(err);
         statusCode = simplifiedError === null || simplifiedError === void 0 ? void 0 : simplifiedError.statusCode;
         message = simplifiedError === null || simplifiedError === void 0 ? void 0 : simplifiedError.message;

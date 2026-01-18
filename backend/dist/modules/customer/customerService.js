@@ -35,7 +35,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendSMSService = exports.sendEmailService = exports.resetCustomerPasswordService = exports.updateCustomerActiveService = exports.updateCustomerImageService = exports.updateCustomerProfileService = exports.updateCustomerPasswordService = exports.verifyPhoneAndRegisterService = exports.getCustomerByPhoneService = exports.getByIdCustomerService = exports.getAllCustomerService = exports.loginCustomerService = exports.registerCustomerService = exports.addCustomerService = void 0;
+exports.sendSMSService = exports.sendEmailService = exports.resetCustomerPasswordService = exports.updateCustomerActiveService = exports.updateCustomerImageService = exports.updateCustomerProfileService = exports.updateCustomerPasswordService = exports.verifyPhoneAndRegisterService = exports.getCustomerByPhoneService = exports.deleteCustomerService = exports.getByIdCustomerService = exports.getAllCustomerService = exports.loginCustomerService = exports.registerCustomerService = exports.addCustomerService = void 0;
 const AppError_1 = __importDefault(require("../../errors/AppError"));
 const http_status_1 = __importDefault(require("http-status"));
 const QueryBuilder_1 = __importDefault(require("../../builders/QueryBuilder"));
@@ -118,7 +118,7 @@ const loginCustomerService = (data) => __awaiter(void 0, void 0, void 0, functio
 });
 exports.loginCustomerService = loginCustomerService;
 const getAllCustomerService = (query) => __awaiter(void 0, void 0, void 0, function* () {
-    const CustomerQuery = new QueryBuilder_1.default(customerModel_1.Customer.find().populate('serviceBy', 'name'), query)
+    const CustomerQuery = new QueryBuilder_1.default(customerModel_1.Customer.find({ isDeleted: false }).populate('serviceBy', 'name'), query)
         .search(['name', 'phone', 'email'])
         .filter()
         .sort()
@@ -133,13 +133,22 @@ const getAllCustomerService = (query) => __awaiter(void 0, void 0, void 0, funct
 });
 exports.getAllCustomerService = getAllCustomerService;
 const getByIdCustomerService = (id) => __awaiter(void 0, void 0, void 0, function* () {
-    const result = yield customerModel_1.Customer.findById(id).populate({
+    const result = yield customerModel_1.Customer.findOne({ _id: id, isDeleted: false }).populate({
         path: 'serviceBy',
         select: 'name',
     });
     return result;
 });
 exports.getByIdCustomerService = getByIdCustomerService;
+const deleteCustomerService = (id) => __awaiter(void 0, void 0, void 0, function* () {
+    const isExist = yield customerModel_1.Customer.findById(id);
+    if (!isExist || isExist.isDeleted) {
+        throw new AppError_1.default(http_status_1.default.NOT_FOUND, 'Customer not found');
+    }
+    yield customerModel_1.Customer.findByIdAndUpdate(id, { isDeleted: true, isActive: false }, { new: true });
+    return true;
+});
+exports.deleteCustomerService = deleteCustomerService;
 const getCustomerByPhoneService = (phone) => __awaiter(void 0, void 0, void 0, function* () {
     const result = yield customerModel_1.Customer.findOne({ phone });
     return result;

@@ -31,7 +31,7 @@ const addSubCategoryService = (data) => __awaiter(void 0, void 0, void 0, functi
         throw new AppError_1.default(http_status_1.default.BAD_REQUEST, 'Invalid categoryId');
     const newSubCategory = yield subCategoryModel_1.SubCategory.create({
         name,
-        slug: (0, makeSlug_1.makeSlug)(name) + '-' + Date.now(),
+        slug: (0, makeSlug_1.makeSlug)(name),
         category: new mongoose_1.default.Types.ObjectId(categoryId),
     });
     const category = yield categoryModel_1.Category.findById(categoryId);

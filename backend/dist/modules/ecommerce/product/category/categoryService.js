@@ -23,12 +23,12 @@ const addCategoryService = (data) => __awaiter(void 0, void 0, void 0, function*
 });
 exports.addCategoryService = addCategoryService;
 const getAllCategoryService = () => __awaiter(void 0, void 0, void 0, function* () {
-    const result = yield categoryModel_1.Category.find({});
+    const result = yield categoryModel_1.Category.find({}).populate('subCategories', 'name slug ');
     return result;
 });
 exports.getAllCategoryService = getAllCategoryService;
 const getSingleCategoryService = (id) => __awaiter(void 0, void 0, void 0, function* () {
-    const result = yield categoryModel_1.Category.findById(id);
+    const result = yield categoryModel_1.Category.findById(id).populate('subCategories', 'name slug ');
     return result;
 });
 exports.getSingleCategoryService = getSingleCategoryService;

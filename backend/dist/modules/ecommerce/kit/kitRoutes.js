@@ -5,28 +5,13 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.kitRoutes = void 0;
 const express_1 = __importDefault(require("express"));
-const multer_1 = __importDefault(require("multer"));
 const kitController_1 = require("./kitController");
 const verifyPermission_1 = require("../../../middlewares/verifyPermission");
+const multerUploader_1 = require("../../../utils/multerUploader");
 const router = express_1.default.Router();
-const storage = multer_1.default.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, './uploads/kit');
-    },
-    filename: function (req, file, cb) {
-        cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}-${file.originalname}`);
-    },
-});
-const upload = (0, multer_1.default)({
-    storage: storage,
-    fileFilter: (req, file, cb) => {
-        if (file.mimetype.startsWith('image/')) {
-            cb(null, true);
-        }
-        else {
-            cb(null, false);
-        }
-    }
+const upload = (0, multerUploader_1.createUploader)({
+    uploadSubdir: 'kit',
+    rules: [{ fieldName: 'image', allowed: ['image'] }],
 }).single('image');
 router.post('/add', upload, (req, res, next) => {
     req.body = req.body.data && JSON.parse(req.body.data);

@@ -52,6 +52,8 @@ const supportFormRoute_1 = require("../modules/ecommerce/support/supportFormRout
 const complainFormRoute_1 = require("../modules/ecommerce/complaint/complainFormRoute");
 const blogRoute_1 = require("../modules/ecommerce/blog/blogRoute");
 const warrantyFormRoute_1 = require("../modules/ecommerce/warrantyClaim/warrantyFormRoute");
+const flashDealRoute_1 = require("../modules/ecommerce/flashDeal/flashDealRoute");
+const faqRoute_1 = require("../modules/ecommerce/faq/faqRoute");
 const moduleRoutes = [
     {
         path: '/auth',
@@ -309,6 +311,16 @@ const moduleRoutes = [
         path: '/warranty-claim',
         route: warrantyFormRoute_1.warrantyFormRoute,
         permissionRoute: true,
+    },
+    {
+        path: '/flash-deal',
+        route: flashDealRoute_1.flashDealRoute,
+        permissionRoute: true,
+    },
+    {
+        path: '/faq',
+        route: faqRoute_1.faqRoutes,
+        permissionRoute: false,
     },
 ];
 moduleRoutes.forEach((route) => router.use(route.path, route.route));

@@ -12,7 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.sendSMSController = exports.sendEmailController = exports.updateCustomerActiveController = exports.updateCustomerImageController = exports.updateCustomerProfileController = exports.resetCustomerPasswordController = exports.updateCustomerPasswordController = exports.verifyPhoneAndRegisterController = exports.getCustomerByPhoneController = exports.getByIdCustomerController = exports.getAllCustomerController = exports.loginCustomerController = exports.registerCustomerController = exports.addCustomerController = void 0;
+exports.sendSMSController = exports.sendEmailController = exports.updateCustomerActiveController = exports.updateCustomerImageController = exports.deleteCustomerController = exports.updateCustomerProfileController = exports.resetCustomerPasswordController = exports.updateCustomerPasswordController = exports.verifyPhoneAndRegisterController = exports.getCustomerByPhoneController = exports.getByIdCustomerController = exports.getAllCustomerController = exports.loginCustomerController = exports.registerCustomerController = exports.addCustomerController = void 0;
 const config_1 = __importDefault(require("../../config"));
 const catchAsync_1 = require("../../utils/catchAsync");
 const customerService_1 = require("./customerService");
@@ -116,7 +116,17 @@ exports.updateCustomerProfileController = (0, catchAsync_1.catchAsync)((req, res
     const { id } = req.params;
     const rawPayload = (_c = (_b = (_a = req.body) === null || _a === void 0 ? void 0 : _a.data) !== null && _b !== void 0 ? _b : req.body) !== null && _c !== void 0 ? _c : {};
     // Whitelist allowed updatable fields
-    const allowed = ['name', 'phone', 'email', 'address', 'note', 'priority'];
+    const allowed = [
+        'name',
+        'phone',
+        'email',
+        'address',
+        'note',
+        'priority',
+        'status',
+        'source',
+        'serviceBy',
+    ];
     const updatePayload = {};
     for (const key of allowed) {
         if (rawPayload[key] !== undefined)
@@ -128,6 +138,14 @@ exports.updateCustomerProfileController = (0, catchAsync_1.catchAsync)((req, res
         message: 'Customer profile updated successfully',
         yourupdate: updatePayload,
         data: result,
+    });
+}));
+exports.deleteCustomerController = (0, catchAsync_1.catchAsync)((req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const { id } = req.params;
+    yield (0, customerService_1.deleteCustomerService)(id);
+    res.status(http_status_1.default.OK).json({
+        success: true,
+        message: 'Customer delete success',
     });
 }));
 exports.updateCustomerImageController = (0, catchAsync_1.catchAsync)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {

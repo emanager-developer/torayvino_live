@@ -61,20 +61,25 @@ const initPaymentValidation = zod_1.z.object({
     }),
     currency: zod_1.z.string().optional(),
 });
-const refundBkashPaymentValidation = zod_1.z.object({
-    paymentID: zod_1.z.string({
-        required_error: 'Payment ID is required',
-    }),
-    trxID: zod_1.z.string({
-        required_error: 'Transaction ID is required',
-    }),
-    amount: zod_1.z.number({
+const refundBkashPaymentValidation = zod_1.z
+    .object({
+    paymentObjectId: zod_1.z.string().optional(),
+    orderId: zod_1.z.string().optional(),
+    paymentID: zod_1.z.string().optional(),
+    trxID: zod_1.z.string().optional(),
+    amount: zod_1.z
+        .number({
         required_error: 'Refund amount is required',
-    }).min(1, 'Refund amount must be greater than 0'),
+    })
+        .min(1, 'Refund amount must be greater than 0'),
     reason: zod_1.z.string({
         required_error: 'Refund reason is required',
     }),
     sku: zod_1.z.string().optional(),
+})
+    .refine((data) => !!data.paymentObjectId || (!!data.paymentID && !!data.trxID), {
+    message: 'Provide paymentObjectId OR both paymentID and trxID',
+    path: ['paymentID'],
 });
 exports.PaymentValidation = {
     initPaymentValidation,

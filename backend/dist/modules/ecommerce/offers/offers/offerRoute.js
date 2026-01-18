@@ -7,41 +7,15 @@ exports.offerRoute = void 0;
 const express_1 = __importDefault(require("express"));
 const offerController_1 = require("./offerController");
 const verifyPermission_1 = require("../../../../middlewares/verifyPermission");
-const multer_1 = __importDefault(require("multer"));
-const fs_1 = __importDefault(require("fs"));
+const multerUploader_1 = require("../../../../utils/multerUploader");
 const Router = express_1.default.Router();
-// Create uploads directory if it doesn't exist
-const uploadsDir = './uploads/offers';
-if (!fs_1.default.existsSync(uploadsDir)) {
-    fs_1.default.mkdirSync(uploadsDir, { recursive: true });
-}
-const storage = multer_1.default.diskStorage({
-    destination: function (req, file, cb) {
-        cb(null, './uploads/offers');
-    },
-    filename: function (req, file, cb) {
-        cb(null, `${Date.now()}-${Math.round(Math.random() * 1e9)}-${file.originalname}`);
-    },
-});
-const upload = (0, multer_1.default)({
-    storage: storage,
-    fileFilter: (req, file, cb) => {
-        // Allow only image files for thumbnail, desktop banners, and mobile banners
-        if (file.fieldname === 'thumbnail' || file.fieldname === 'desktopBanners' || file.fieldname === 'mobileBanners') {
-            if (file.mimetype.startsWith('image/')) {
-                cb(null, true);
-            }
-            else {
-                cb(new Error('Only image files are allowed for thumbnail and banners'));
-            }
-        }
-        else {
-            cb(null, true);
-        }
-    },
-    limits: {
-        fileSize: 5 * 1024 * 1024, // 5MB limit
-    },
+const upload = (0, multerUploader_1.createUploader)({
+    uploadSubdir: 'offers',
+    rules: [
+        { fieldName: 'thumbnail', allowed: ['image'] },
+        { fieldName: 'desktopBanners', allowed: ['image'] },
+        { fieldName: 'mobileBanners', allowed: ['image'] },
+    ],
 }).fields([
     { name: 'thumbnail', maxCount: 1 },
     { name: 'desktopBanners', maxCount: 10 }, // Allow up to 10 desktop banner images

@@ -19,11 +19,26 @@ const catchAsync_1 = require("../../../utils/catchAsync");
 const AppError_1 = __importDefault(require("../../../errors/AppError"));
 const deleteFile_1 = require("../../../utils/deleteFile");
 exports.addAboutController = (0, catchAsync_1.catchAsync)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
-    var _a;
-    const image = (_a = req === null || req === void 0 ? void 0 : req.file) === null || _a === void 0 ? void 0 : _a.filename;
-    if (!image)
+    var _a, _b;
+    const files = req.files || [];
+    const heroFile = files.find((f) => f.fieldname === 'image');
+    const heroImage = heroFile === null || heroFile === void 0 ? void 0 : heroFile.filename;
+    const testimonialImagesByIndex = new Map();
+    for (const file of files) {
+        const match = file.fieldname.match(/^testimonialImage_(\d+)$/);
+        if (match === null || match === void 0 ? void 0 : match[1]) {
+            testimonialImagesByIndex.set(Number(match[1]), `/about/${file.filename}`);
+        }
+    }
+    if (!heroImage)
         throw new AppError_1.default(http_status_1.default.NOT_FOUND, 'About image is required !');
-    const data = Object.assign({ image: `/about/${image}` }, req.body);
+    const incomingTestimonials = ((_a = req.body) === null || _a === void 0 ? void 0 : _a.testimonials) && Array.isArray(req.body.testimonials)
+        ? req.body.testimonials
+        : ((_b = req.body) === null || _b === void 0 ? void 0 : _b.testimonial)
+            ? [req.body.testimonial]
+            : undefined;
+    const testimonials = incomingTestimonials === null || incomingTestimonials === void 0 ? void 0 : incomingTestimonials.map((t, index) => (Object.assign(Object.assign({}, t), { image: testimonialImagesByIndex.get(index) || (t === null || t === void 0 ? void 0 : t.image) })));
+    const data = Object.assign(Object.assign({ image: `/about/${heroImage}` }, req.body), { testimonials });
     try {
         const result = yield (0, aboutService_1.addAboutService)(data);
         res.status(200).json({
@@ -33,8 +48,13 @@ exports.addAboutController = (0, catchAsync_1.catchAsync)((req, res, next) => __
         });
     }
     catch (error) {
-        if (image)
-            (0, deleteFile_1.deleteFile)(`./uploads/about/${image}`);
+        if (heroImage)
+            (0, deleteFile_1.deleteFile)(`./uploads/about/${heroImage}`);
+        for (const file of files) {
+            if (file.fieldname.startsWith('testimonialImage_')) {
+                (0, deleteFile_1.deleteFile)(`./uploads/about/${file.filename}`);
+            }
+        }
         next(error);
     }
 }));
@@ -48,9 +68,22 @@ exports.getAboutController = (0, catchAsync_1.catchAsync)((req, res) => __awaite
 }));
 exports.updateAboutController = (0, catchAsync_1.catchAsync)((req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
-    const image = (_a = req === null || req === void 0 ? void 0 : req.file) === null || _a === void 0 ? void 0 : _a.filename;
+    const files = req.files || [];
+    const heroFile = files.find((f) => f.fieldname === 'image');
+    const heroImage = heroFile === null || heroFile === void 0 ? void 0 : heroFile.filename;
+    const testimonialImagesByIndex = new Map();
+    for (const file of files) {
+        const match = file.fieldname.match(/^testimonialImage_(\d+)$/);
+        if (match === null || match === void 0 ? void 0 : match[1]) {
+            testimonialImagesByIndex.set(Number(match[1]), `/about/${file.filename}`);
+        }
+    }
     const id = req.params.id;
-    const data = Object.assign({ image: image ? `/about/${image}` : undefined }, req.body);
+    const incomingTestimonials = ((_a = req.body) === null || _a === void 0 ? void 0 : _a.testimonials) && Array.isArray(req.body.testimonials)
+        ? req.body.testimonials
+        : undefined;
+    const testimonials = incomingTestimonials === null || incomingTestimonials === void 0 ? void 0 : incomingTestimonials.map((t, index) => (Object.assign(Object.assign({}, t), { image: testimonialImagesByIndex.get(index) || (t === null || t === void 0 ? void 0 : t.image) })));
+    const data = Object.assign(Object.assign({ image: heroImage ? `/about/${heroImage}` : undefined }, req.body), { testimonials });
     try {
         const result = yield (0, aboutService_1.updateAboutService)(data, id);
         res.status(200).json({
@@ -60,8 +93,13 @@ exports.updateAboutController = (0, catchAsync_1.catchAsync)((req, res, next) =>
         });
     }
     catch (error) {
-        if (image)
-            (0, deleteFile_1.deleteFile)(`./uploads/about/${image}`);
+        if (heroImage)
+            (0, deleteFile_1.deleteFile)(`./uploads/about/${heroImage}`);
+        for (const file of files) {
+            if (file.fieldname.startsWith('testimonialImage_')) {
+                (0, deleteFile_1.deleteFile)(`./uploads/about/${file.filename}`);
+            }
+        }
         next(error);
     }
 }));

@@ -97,10 +97,14 @@ const initSSLPayment = (paymentData) => __awaiter(void 0, void 0, void 0, functi
         ship_postcode: 1000,
         ship_country: 'Bangladesh',
     };
-    const response = yield (0, axios_1.default)({
-        method: 'POST',
-        url: config_1.default.SSL_PAYMENT_URL,
-        data: sslData,
+    // SSLCommerz expects application/x-www-form-urlencoded payload
+    const form = new URLSearchParams();
+    for (const [key, value] of Object.entries(sslData)) {
+        if (value === undefined || value === null)
+            continue;
+        form.append(key, String(value));
+    }
+    const response = yield axios_1.default.post(config_1.default.SSL_PAYMENT_URL, form.toString(), {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     });
     if (((_a = response === null || response === void 0 ? void 0 : response.data) === null || _a === void 0 ? void 0 : _a.status) !== 'SUCCESS') {
@@ -165,7 +169,7 @@ const initSSLPayment = (paymentData) => __awaiter(void 0, void 0, void 0, functi
     const orderData = Object.assign(Object.assign(Object.assign({ customer: customerId, shippingInfo,
         invoiceNumber,
         totalPrice,
-        shippingCharge }, (products && products.length > 0 && { products })), (kits && kits.length > 0 && { kits })), { status: 'pending', isPaid: false, paymentMethod,
+        shippingCharge }, (products && products.length > 0 && { products })), (kits && kits.length > 0 && { kits })), { status: 'pending', isPaid: false, paymentStatus: 'pending', paymentMethod,
         transactionId });
     const order = yield orderModel_1.Order.create(orderData);
     // Create payment record
@@ -193,6 +197,12 @@ const paymentSuccess = (transactionId) => __awaiter(void 0, void 0, void 0, func
     const session = yield mongoose_1.default.startSession();
     try {
         session.startTransaction();
+        // Idempotency: if already paid, do nothing
+        if (order.isPaid === true) {
+            yield session.commitTransaction();
+            yield session.endSession();
+            return order;
+        }
         // Update order as paid
         const updatedOrder = yield orderModel_1.Order.findOneAndUpdate({ transactionId }, {
             $set: {
@@ -201,8 +211,8 @@ const paymentSuccess = (transactionId) => __awaiter(void 0, void 0, void 0, func
                 paymentStatus: 'success',
             },
         }, { new: true, session }).populate('customer');
-        // Update payment status
-        yield paymentModel_1.Payment.findOneAndUpdate({ transactionId }, {
+        // Update payment status (avoid overwriting if already marked success by a concurrent callback)
+        yield paymentModel_1.Payment.findOneAndUpdate({ transactionId, status: { $ne: 'success' } }, {
             $set: {
                 status: 'success',
                 paymentDate: new Date(),
@@ -324,14 +334,21 @@ const paymentFailed = (transactionId) => __awaiter(void 0, void 0, void 0, funct
     const session = yield mongoose_1.default.startSession();
     try {
         session.startTransaction();
-        // Update payment status to failed
-        yield paymentModel_1.Payment.findOneAndUpdate({ transactionId }, {
+        const order = yield orderModel_1.Order.findOne({ transactionId }).session(session);
+        // If already paid, do not mark failed/delete
+        if ((order === null || order === void 0 ? void 0 : order.isPaid) === true || (order === null || order === void 0 ? void 0 : order.paymentStatus) === 'success') {
+            yield session.commitTransaction();
+            yield session.endSession();
+            return { message: 'Payment already successful; ignoring failure callback' };
+        }
+        // Update payment status to failed (do not overwrite success)
+        yield paymentModel_1.Payment.findOneAndUpdate({ transactionId, status: { $ne: 'success' } }, {
             $set: {
                 status: 'failed',
             },
         }, { new: true, session });
         // Update order payment status before deleting
-        yield orderModel_1.Order.findOneAndUpdate({ transactionId }, {
+        yield orderModel_1.Order.findOneAndUpdate({ transactionId, paymentStatus: { $ne: 'success' } }, {
             $set: {
                 paymentStatus: 'failed',
             },
@@ -353,7 +370,7 @@ const getPaymentByTransactionId = (transactionId) => __awaiter(void 0, void 0, v
 });
 const getSuccessfulPayments = (query) => __awaiter(void 0, void 0, void 0, function* () {
     const PaymentQuery = new QueryBuilder_1.default(paymentModel_1.Payment.find({
-        status: { $in: ['success', 'refunded', 'refund_initiated'] },
+        status: { $in: ['success', 'refunded', 'refund_initiated', 'refund_failed'] },
     }).populate('orderId'), query)
         .search(['transactionId', 'paymentMethod'])
         .filter()
